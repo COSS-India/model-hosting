@@ -1,0 +1,85 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+fastapi/  # Exclude virtual environment directory
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+server.log
+*.out
+
+# Environment variables
+.env
+.env.local
+
+# Model cache
+.cache/
+models/
+*.onnx
+*.pt
+*.pth
+*.bin
+
+# Benchmark results
+bench_results/
+bench_run*/
+*.csv
+*.xlsx
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# HuggingFace cache (optional - uncomment if you don't want to track)
+# .cache/huggingface/
+
