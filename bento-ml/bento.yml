@@ -1,0 +1,20 @@
+service: service:svc
+include:
+  - service.py
+  - download_model.py
+  - requirements.txt
+
+python:
+  requirements_txt: requirements.txt
+  packages:
+    - torch
+    - torchaudio
+    - transformers
+    - onnxruntime-gpu
+    - onnx
+    - pydantic
+    - starlette
+    - python-multipart
+    - soundfile
+    - scipy
+  # for GPU builds you may install CUDA-specific wheels e.g. torch + cuda

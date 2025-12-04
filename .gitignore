@@ -21,12 +21,13 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual Environment
+# Virtual Environments
 venv/
 env/
 ENV/
 .venv
-fastapi/  # Exclude virtual environment directory
+**/bento/  # BentoML virtual environments
+**/fastapi/  # FastAPI virtual environments
 
 # IDE
 .vscode/
@@ -44,6 +45,7 @@ server.log
 # Environment variables
 .env
 .env.local
+.env.*.local
 
 # Model cache
 .cache/
@@ -52,12 +54,15 @@ models/
 *.pt
 *.pth
 *.bin
+*.safetensors
 
 # Benchmark results
 bench_results/
+bench_results_*/
 bench_run*/
 *.csv
 *.xlsx
+benchmark_results.xlsx
 
 # Docker
 .dockerignore
@@ -74,13 +79,26 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints
+*.ipynb
 
 # pytest
 .pytest_cache/
 .coverage
 htmlcov/
 
+# BentoML specific
+bento/
+**/bento/
+
+# Audio files (optional - uncomment if you don't want to track sample files)
+# *.wav
+# *.mp3
+# *.flac
+
 # HuggingFace cache (optional - uncomment if you don't want to track)
 # .cache/huggingface/
 
+# System files
+*.pid
+*.lock
 

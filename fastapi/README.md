@@ -11,7 +11,7 @@ FastAPI server hosting the AI4Bharat IndicConformer-600M-Multilingual ASR model 
 
 2. **Set environment variables:**
    ```bash
-   export HF_TOKEN=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
+   export HF_TOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxxx
    export DEVICE=cuda  # or "cpu" if no GPU available
    ```
 
