@@ -26,8 +26,13 @@ venv/
 env/
 ENV/
 .venv
-**/bento/  # BentoML virtual environments
-**/fastapi/  # FastAPI virtual environments
+**/bento/  # BentoML virtual environments (covers bento-ml/bento/)
+fastapi/fastapi/  # FastAPI nested virtual environment
+fastapi_venv/  # FastAPI virtual environments
+
+# Framework-specific virtual environments
+bento-ml/bento/  # BentoML nested virtual environment
+MLflow/mlflow/  # MLflow nested virtual environment (also in MLflow/.gitignore)
 
 # IDE
 .vscode/
