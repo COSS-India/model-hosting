@@ -123,3 +123,8 @@ echo "To view logs: docker logs -f $CONTAINER_NAME"
 echo "To stop container: docker stop $CONTAINER_NAME"
 echo "To remove container: docker rm $CONTAINER_NAME"
 
+
+
+
+
+

@@ -110,6 +110,33 @@ print(f"Latency: {result['latency_ms']} ms")
 - `DEVICE`: Device to use - "cuda" or "cpu" (default: auto-detect)
 - `MODEL_NAME`: HuggingFace model name (default: `ai4bharat/indic-conformer-600m-multilingual`)
 
+## Benchmarking
+
+To benchmark the FastAPI server performance, use the FastAPI-specific benchmark script:
+
+```bash
+cd ../  # Go to Frameworks directory
+python benchmark_asr_fastapi.py \
+  --endpoint http://localhost:8000/asr \
+  --audio /path/to/audio.wav \
+  --lang_id ta \
+  --outputdir /path/to/results \
+  --rate 10.0 \
+  --duration 30 \
+  --sample_interval 0.5
+```
+
+**Note:** The `benchmark_asr_fastapi.py` script is specifically designed for FastAPI endpoints:
+- Uses `audio` field name (not `file`)
+- Does not send `strategy` parameter (FastAPI doesn't use it)
+- Compatible with FastAPI's multipart form data format
+
+The benchmark generates:
+- `benchmark_results.xlsx`: Excel file with comprehensive metrics
+- `requests.csv`: Detailed request-level data
+- `gpu_samples.csv`: GPU utilization samples
+- `sys_samples.csv`: System resource samples
+
 ## Notes
 
 - The model is loaded on server startup, which may take a few minutes

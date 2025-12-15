@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-benchmark_asr_mlflow.py - Comprehensive ASR Benchmark Tool for MLflow Service
+benchmark_asr_triton.py - Comprehensive ASR Benchmark Tool for NVIDIA Triton Inference Server
 
 Usage:
-  python benchmark_asr_mlflow.py \
-    --endpoint http://127.0.0.1:5000/asr \
+  python benchmark_asr_triton.py \
+    --endpoint http://127.0.0.1:8000/v2/models/asr_am_ensemble/infer \
     --audio /path/to/audio.wav \
     --lang_id ta \
     --outputdir /home/ubuntu/bench_results
+
+Note: Uses asr_am_ensemble model (not asr_am_topk_ensemble) to avoid decoder issues.
 
 Output:
   - benchmark_results.xlsx: Excel file with all metrics in separate columns
@@ -20,8 +22,7 @@ import aiohttp
 import time
 import csv
 import os
-import base64
-import json
+import soundfile as sf
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
@@ -102,18 +103,44 @@ def sys_sampler(stop_event, sample_interval, out_list):
     out_list.append((ts, float(cpu), int(mem_used_mb), int(mem_total_mb)))
 
 # ------------------------------
-# Load generator (rate-controlled) - MLflow version
+# Load generator (rate-controlled)
 # ------------------------------
-async def run_rate_test(endpoint, audio_path, rate, duration_s, lang_id, decoding):
+async def run_rate_test(endpoint, audio_path, rate, duration_s, lang_id):
     """
     Sends requests at approx 'rate' req/sec for 'duration_s' seconds.
-    MLflow version: Uses JSON payload with base64-encoded audio.
+    Triton format: JSON with inputs/outputs structure.
     Returns list of (ts, latency_ms, status).
     """
-    # Preload audio bytes and encode to base64
-    with open(audio_path, "rb") as fh:
-        audio_bytes = fh.read()
-    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+    # Preload and process audio file
+    try:
+        audio_data, sample_rate = sf.read(audio_path)
+        # Ensure mono
+        if len(audio_data.shape) > 1:
+            audio_data = np.mean(audio_data, axis=1)
+        # Convert to float32
+        if audio_data.dtype != np.float32:
+            audio_data = audio_data.astype(np.float32)
+        # Normalize if needed
+        if np.abs(audio_data).max() > 1.0:
+            audio_data = audio_data / np.abs(audio_data).max()
+        print(f"[INFO] Loaded audio: {len(audio_data)} samples, sample_rate: {sample_rate} Hz")
+    except Exception as e:
+        print(f"[ERROR] Failed to load audio file: {e}")
+        return []
+
+    # Check server connectivity
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Try to reach health endpoint
+            health_url = endpoint.split('/v2/models')[0] + '/v2/health/ready'
+            async with session.get(health_url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    print(f"[INFO] Triton server is ready")
+                else:
+                    print(f"[WARNING] Triton server health check returned status {resp.status}")
+    except Exception as e:
+        print(f"[WARNING] Could not verify Triton server connectivity: {e}")
+        print(f"[WARNING] Make sure Triton server is running at {endpoint.split('/v2/models')[0]}")
 
     results = []  # (ts, latency_ms, status)
     stop_time = time.time() + duration_s
@@ -134,27 +161,86 @@ async def run_rate_test(endpoint, audio_path, rate, duration_s, lang_id, decodin
         sem = asyncio.Semaphore(max_concurrency)
 
         async def do_request(i):
-            nonlocal session, audio_base64, results, lang_id, decoding
+            nonlocal session, audio_data, results, lang_id
             async with sem:
                 start = time.time()
                 try:
-                    # MLflow format: JSON with audio_base64, lang, decoding
+                    # Prepare Triton inference request format for AI4Bharat ensemble model
+                    # Model: asr_am_ensemble expects:
+                    # - AUDIO_SIGNAL: FP32, shape [batch, num_samples]
+                    # - NUM_SAMPLES: INT32, shape [batch, 1]
+                    # - LANG_ID: BYTES, shape [batch, 1]
+                    num_samples = len(audio_data)
                     payload = {
-                        "audio_base64": audio_base64,
-                        "lang": lang_id,
-                        "decoding": decoding
+                        "inputs": [
+                            {
+                                "name": "AUDIO_SIGNAL",
+                                "shape": [1, num_samples],
+                                "datatype": "FP32",
+                                "data": audio_data.tolist()
+                            },
+                            {
+                                "name": "NUM_SAMPLES",
+                                "shape": [1, 1],
+                                "datatype": "INT32",
+                                "data": [num_samples]
+                            },
+                            {
+                                "name": "LANG_ID",
+                                "shape": [1, 1],
+                                "datatype": "BYTES",
+                                "data": [lang_id]
+                            }
+                        ],
+                        "outputs": [
+                            {"name": "TRANSCRIPTS"}
+                        ]
                     }
+                    
                     async with session.post(
-                        endpoint, 
+                        endpoint,
                         json=payload,
                         headers={"Content-Type": "application/json"}
                     ) as resp:
-                        await resp.read()  # ensure body read
                         latency = (time.time() - start) * 1000.0
-                        results.append((start, latency, resp.status))
+                        if resp.status == 200:
+                            try:
+                                response_data = await resp.json()
+                                # Check if we got a valid transcript (not empty)
+                                outputs = response_data.get('outputs', [])
+                                if outputs and len(outputs) > 0:
+                                    transcript_data = outputs[0].get('data', [])
+                                    if transcript_data and len(transcript_data) > 0 and transcript_data[0]:
+                                        results.append((start, latency, resp.status))
+                                    else:
+                                        # Empty transcript - treat as failed
+                                        results.append((start, latency, 0))
+                                else:
+                                    results.append((start, latency, 0))
+                            except Exception as json_err:
+                                # Response is not valid JSON
+                                error_text = await resp.text()
+                                if len(results) < 3:  # Only print first few errors
+                                    print(f"[ERROR] Failed to parse JSON response: {json_err}")
+                                    print(f"[ERROR] Response: {error_text[:200]}")
+                                results.append((start, latency, 0))
+                        else:
+                            # Non-200 status
+                            error_text = await resp.text()
+                            if len(results) < 3:  # Only print first few errors
+                                print(f"[ERROR] Request failed with status {resp.status}: {error_text[:200]}")
+                            results.append((start, latency, resp.status))
+                except aiohttp.ClientError as e:
+                    latency = (time.time() - start) * 1000.0
+                    # Only print first few errors to avoid spam
+                    if len(results) < 3:
+                        print(f"[ERROR] Client error: {e}")
+                    results.append((start, latency, 0))
                 except Exception as e:
                     latency = (time.time() - start) * 1000.0
-                    # use status 0 for failures
+                    # Only print first few errors to avoid spam
+                    if len(results) < 3:
+                        print(f"[ERROR] Unexpected error: {type(e).__name__}: {e}")
                     results.append((start, latency, 0))
 
         # Loop and schedule requests
@@ -362,7 +448,6 @@ def write_excel_summary(out_dir, metrics):
         "Target_Rate_RPS": [metrics["config"]["rate"]],
         "Audio_Size_Bytes": [metrics["config"]["audio_size_bytes"]],
         "Language_ID": [metrics["config"]["lang_id"]],
-        "Decoding_Strategy": [metrics["config"]["decoding"]],
     }
     
     df = pd.DataFrame(data)
@@ -385,11 +470,11 @@ def write_excel_summary(out_dir, metrics):
 # ------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Comprehensive ASR Benchmark Tool for MLflow Service - Generates Excel report with all metrics",
+        description="Comprehensive ASR Benchmark Tool - Generates Excel report with all metrics",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--endpoint", required=True, 
-                       help="MLflow ASR endpoint URL (e.g. http://127.0.0.1:5000/asr)")
+                       help="ASR endpoint URL (e.g. http://127.0.0.1:8000/v2/models/asr_am_ensemble/infer)")
     parser.add_argument("--audio", required=True, 
                        help="Path to WAV file used for requests")
     parser.add_argument("--lang_id", required=True, 
@@ -402,8 +487,6 @@ def main():
                        help="Duration in seconds (default: 30)")
     parser.add_argument("--sample_interval", type=float, default=0.5, 
                        help="Sampling interval for GPU/CPU in seconds (default: 0.5)")
-    parser.add_argument("--decoding", type=str, default="ctc",
-                       help="Decoding strategy: 'ctc' or 'greedy' (default: ctc)")
     
     args = parser.parse_args()
     
@@ -445,12 +528,11 @@ def main():
     sys_thread.start()
     
     print(f"\n{'='*60}")
-    print(f"MLflow ASR Benchmark Tool")
+    print(f"ASR Benchmark Tool")
     print(f"{'='*60}")
     print(f"Endpoint: {args.endpoint}")
     print(f"Audio: {args.audio}")
     print(f"Language: {args.lang_id}")
-    print(f"Decoding: {args.decoding}")
     print(f"Rate: {args.rate} req/s")
     print(f"Duration: {args.duration}s")
     print(f"Output: {outdir}")
@@ -462,7 +544,7 @@ def main():
     start_time = time.time()
     try:
         results = loop.run_until_complete(
-            run_rate_test(args.endpoint, args.audio, args.rate, args.duration, args.lang_id, args.decoding)
+            run_rate_test(args.endpoint, args.audio, args.rate, args.duration, args.lang_id)
         )
     finally:
         end_time = time.time()
@@ -507,8 +589,7 @@ def main():
             "duration_s": args.duration,
             "rate": args.rate,
             "audio_size_bytes": audio_size_bytes,
-            "lang_id": args.lang_id,
-            "decoding": args.decoding
+            "lang_id": args.lang_id
         }
     }
     

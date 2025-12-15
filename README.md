@@ -1,6 +1,6 @@
 # ASR Framework Benchmarking Suite
 
-A comprehensive benchmarking suite for comparing Automatic Speech Recognition (ASR) performance across different frameworks: **FastAPI**, **BentoML**, and **NVIDIA Triton**.
+A comprehensive benchmarking suite for comparing Automatic Speech Recognition (ASR) performance across different frameworks: **FastAPI**, **BentoML**, and **MLflow**.
 
 ## 📋 Table of Contents
 
@@ -21,14 +21,14 @@ A comprehensive benchmarking suite for comparing Automatic Speech Recognition (A
 
 This project provides:
 - **ASR Model**: AI4Bharat IndicConformer-600M-Multilingual model
-- **Multiple Framework Implementations**: FastAPI, BentoML
+- **Multiple Framework Implementations**: FastAPI, BentoML, MLflow
 - **Comprehensive Benchmarking**: Latency (p50, p95, p99), QPS, GPU/CPU utilization, Memory usage, Throughput
 - **Docker Support**: Containerized deployments for all frameworks
 - **Excel Reports**: Detailed performance metrics in spreadsheet format
 
 ## ✨ Features
 
-- **Multi-Framework Support**: Compare performance across FastAPI and BentoML
+- **Multi-Framework Support**: Compare performance across FastAPI, BentoML, and MLflow
 - **Comprehensive Metrics**: 
   - Latency percentiles (p50, p95, p99)
   - Queries Per Second (QPS)
@@ -48,7 +48,9 @@ Benchmarking/
 ├── .gitignore               # Git ignore rules
 │
 ├── Frameworks/
-│   ├── benchmark_asr.py     # Main benchmark script (framework-independent)
+│   ├── benchmark_asr.py     # Main benchmark script (BentoML)
+│   ├── benchmark_asr_fastapi.py # FastAPI-specific benchmark script
+│   ├── benchmark_asr_mlflow.py # MLflow-specific benchmark script
 │   │
 │   ├── fastapi/             # FastAPI implementation
 │   │   ├── app.py           # FastAPI ASR service
@@ -56,13 +58,21 @@ Benchmarking/
 │   │   ├── requirements.txt # Python dependencies
 │   │   └── README.md        # FastAPI-specific docs
 │   │
-│   └── bento-ml/            # BentoML implementation
-│       ├── service.py       # BentoML ASR service
-│       ├── download_model.py # Model download script
-│       ├── bento.yml        # BentoML configuration
+│   ├── bento-ml/            # BentoML implementation
+│   │   ├── service.py       # BentoML ASR service
+│   │   ├── download_model.py # Model download script
+│   │   ├── bento.yml        # BentoML configuration
+│   │   ├── requirements.txt # Python dependencies
+│   │   ├── run_docker_background.sh # Docker run script
+│   │   └── DOCKER_USAGE.md  # Docker usage guide
+│   │
+│   └── MLflow/              # MLflow implementation
+│       ├── mlflow_asr.py    # MLflow PyFunc model wrapper
+│       ├── log_model.py     # Model logging script
+│       ├── server.py        # Custom MLflow server
+│       ├── Dockerfile       # Docker configuration
 │       ├── requirements.txt # Python dependencies
-│       ├── run_docker_background.sh # Docker run script
-│       └── DOCKER_USAGE.md  # Docker usage guide
+│       └── README.md        # MLflow-specific docs
 │
 └── ta2.wav                   # Sample audio file for testing
 ```
@@ -105,14 +115,43 @@ bentoml containerize indic_conformer_asr:latest -t indic_conformer_asr:latest
 HF_TOKEN=$HF_TOKEN ./run_docker_background.sh
 ```
 
+#### MLflow (Docker)
+```bash
+cd Frameworks/MLflow
+# Log model to MLflow (one-time setup)
+source mlflow/bin/activate
+python log_model.py
+
+# Build and run Docker container
+./build_docker.sh
+./run_docker.sh
+```
+
 ### 4. Run Benchmark
 
 ```bash
 cd Frameworks
-python benchmark_asr.py \
+
+# For FastAPI (uses 'audio' field name)
+python benchmark_asr_fastapi.py \
   --endpoint http://localhost:8000/asr \
   --audio ../ta2.wav \
   --lang_id ta \
+  --outputdir ../bench_results
+
+# For BentoML (uses 'file' field name)
+python benchmark_asr.py \
+  --endpoint http://localhost:3000/asr \
+  --audio ../ta2.wav \
+  --lang_id ta \
+  --outputdir ../bench_results
+
+# For MLflow (uses different endpoint format)
+python benchmark_asr_mlflow.py \
+  --endpoint http://localhost:5000/asr \
+  --audio ../ta2.wav \
+  --lang_id ta \
+  --decoding ctc \
   --outputdir ../bench_results
 ```
 
@@ -159,6 +198,12 @@ cd Frameworks/bento-ml
 HF_TOKEN=$HF_TOKEN ./run_docker_background.sh
 ```
 
+#### MLflow
+```bash
+cd Frameworks/MLflow
+./run_docker.sh
+```
+
 ### Testing a Service
 
 ```bash
@@ -172,44 +217,106 @@ curl -X POST http://localhost:3000/asr \
   -F "file=@../ta2.wav" \
   -F "lang=ta" \
   -F "strategy=ctc"
+
+# MLflow
+curl -X POST http://localhost:5000/asr \
+  -H "Content-Type: application/json" \
+  -d "$(python3 -c "import base64, json; audio_b64 = base64.b64encode(open('../ta2.wav', 'rb').read()).decode('utf-8'); print(json.dumps({'audio_base64': audio_b64, 'lang': 'ta', 'decoding': 'ctc'}))")" \
+  | python3 -m json.tool
 ```
 
 ## 📊 Benchmarking
 
-The benchmark script is framework-independent and works with any ASR endpoint.
+Each framework has its own benchmark script optimized for the specific API format.
 
 ### Basic Usage
 
+**For FastAPI:**
 ```bash
-python benchmark_asr.py \
+python benchmark_asr_fastapi.py \
   --endpoint http://localhost:8000/asr \
   --audio /path/to/audio.wav \
   --lang_id ta \
   --outputdir /path/to/results
 ```
 
-### Advanced Options
-
+**For BentoML:**
 ```bash
 python benchmark_asr.py \
+  --endpoint http://localhost:3000/asr \
+  --audio /path/to/audio.wav \
+  --lang_id ta \
+  --outputdir /path/to/results
+```
+
+**For MLflow:**
+```bash
+python benchmark_asr_mlflow.py \
+  --endpoint http://localhost:5000/asr \
+  --audio /path/to/audio.wav \
+  --lang_id ta \
+  --decoding ctc \
+  --outputdir /path/to/results
+```
+
+### Advanced Options
+
+**For FastAPI:**
+```bash
+python benchmark_asr_fastapi.py \
   --endpoint http://localhost:8000/asr \
   --audio /path/to/audio.wav \
   --lang_id ta \
   --outputdir /path/to/results \
   --duration 60 \
   --rate 10 \
-  --concurrency 5
+  --sample_interval 0.5
+```
+
+**For BentoML:**
+```bash
+python benchmark_asr.py \
+  --endpoint http://localhost:3000/asr \
+  --audio /path/to/audio.wav \
+  --lang_id ta \
+  --outputdir /path/to/results \
+  --duration 60 \
+  --rate 10 \
+  --sample_interval 0.5
+```
+
+**For MLflow:**
+```bash
+python benchmark_asr_mlflow.py \
+  --endpoint http://localhost:5000/asr \
+  --audio /path/to/audio.wav \
+  --lang_id ta \
+  --decoding ctc \
+  --outputdir /path/to/results \
+  --duration 60 \
+  --rate 10 \
+  --sample_interval 0.5
 ```
 
 ### Parameters
 
+**Common Parameters (all scripts):**
 - `--endpoint`: ASR service endpoint URL
 - `--audio`: Path to audio file (WAV format)
 - `--lang_id`: Language code (e.g., `ta`, `hi`, `en`)
 - `--outputdir`: Output directory for results
-- `--duration`: Benchmark duration in seconds (default: 60)
-- `--rate`: Target requests per second (default: 10)
-- `--concurrency`: Number of concurrent requests (default: 5)
+- `--duration`: Benchmark duration in seconds (default: 30)
+- `--rate`: Target requests per second (default: 10.0)
+- `--sample_interval`: Sampling interval for GPU/CPU in seconds (default: 0.5)
+
+**MLflow specific:**
+- `--decoding`: Decoding strategy - `ctc` or `greedy` (default: ctc)
+
+### Framework-Specific Notes
+
+- **FastAPI** (`benchmark_asr_fastapi.py`): Uses `audio` field name in multipart form data
+- **BentoML** (`benchmark_asr.py`): Uses `file` field name and includes `strategy` parameter
+- **MLflow** (`benchmark_asr_mlflow.py`): Uses JSON format with `audio_base64` field
 
 ### Output
 
@@ -242,6 +349,14 @@ The benchmark generates:
 
 - [BentoML Docker Guide](Frameworks/bento-ml/DOCKER_USAGE.md)
 - [Container Setup](Frameworks/bento-ml/README_CONTAINER.md)
+
+### MLflow
+
+- [MLflow README](Frameworks/MLflow/README.md)
+- [MLflow Quick Start](Frameworks/MLflow/QUICKSTART.md)
+- [MLflow Docker Guide](Frameworks/MLflow/DOCKER.md)
+- [MLflow Docker Quick Start](Frameworks/MLflow/DOCKER_QUICKSTART.md)
+- [MLflow API Reference](Frameworks/MLflow/API_REFERENCE.md)
 
 ## 📈 Results
 
@@ -278,6 +393,7 @@ Benchmark results are exported to Excel with the following columns:
 - [AI4Bharat IndicConformer Model](https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual)
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [BentoML Documentation](https://docs.bentoml.com/)
+- [MLflow Documentation](https://mlflow.org/docs/latest/index.html)
 
 ---
 

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-benchmark_asr_mlflow.py - Comprehensive ASR Benchmark Tool for MLflow Service
+benchmark_asr_fastapi.py - Comprehensive ASR Benchmark Tool for FastAPI
+
+This is a FastAPI-compatible version of benchmark_asr.py.
+It uses 'audio' field name instead of 'file' and doesn't send 'strategy' parameter.
 
 Usage:
-  python benchmark_asr_mlflow.py \
-    --endpoint http://127.0.0.1:5000/asr \
+  python benchmark_asr_fastapi.py \
+    --endpoint http://127.0.0.1:8000/asr \
     --audio /path/to/audio.wav \
     --lang_id ta \
     --outputdir /home/ubuntu/bench_results
@@ -20,8 +23,6 @@ import aiohttp
 import time
 import csv
 import os
-import base64
-import json
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
@@ -102,18 +103,17 @@ def sys_sampler(stop_event, sample_interval, out_list):
     out_list.append((ts, float(cpu), int(mem_used_mb), int(mem_total_mb)))
 
 # ------------------------------
-# Load generator (rate-controlled) - MLflow version
+# Load generator (rate-controlled)
 # ------------------------------
-async def run_rate_test(endpoint, audio_path, rate, duration_s, lang_id, decoding):
+async def run_rate_test(endpoint, audio_path, rate, duration_s, lang_id):
     """
     Sends requests at approx 'rate' req/sec for 'duration_s' seconds.
-    MLflow version: Uses JSON payload with base64-encoded audio.
     Returns list of (ts, latency_ms, status).
     """
-    # Preload audio bytes and encode to base64
+    # Preload audio bytes into memory
     with open(audio_path, "rb") as fh:
         audio_bytes = fh.read()
-    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+    filename = Path(audio_path).name
 
     results = []  # (ts, latency_ms, status)
     stop_time = time.time() + duration_s
@@ -134,21 +134,19 @@ async def run_rate_test(endpoint, audio_path, rate, duration_s, lang_id, decodin
         sem = asyncio.Semaphore(max_concurrency)
 
         async def do_request(i):
-            nonlocal session, audio_base64, results, lang_id, decoding
+            nonlocal session, filename, audio_bytes, results, lang_id
             async with sem:
                 start = time.time()
                 try:
-                    # MLflow format: JSON with audio_base64, lang, decoding
-                    payload = {
-                        "audio_base64": audio_base64,
-                        "lang": lang_id,
-                        "decoding": decoding
-                    }
-                    async with session.post(
-                        endpoint, 
-                        json=payload,
-                        headers={"Content-Type": "application/json"}
-                    ) as resp:
+                    data = aiohttp.FormData()
+                    # FastAPI expects field name 'audio', not 'file'
+                    data.add_field('audio',
+                                   audio_bytes,
+                                   filename=filename,
+                                   content_type='audio/wav')
+                    data.add_field('lang', lang_id)
+                    # Note: FastAPI doesn't use 'strategy' parameter
+                    async with session.post(endpoint, data=data) as resp:
                         await resp.read()  # ensure body read
                         latency = (time.time() - start) * 1000.0
                         results.append((start, latency, resp.status))
@@ -362,7 +360,6 @@ def write_excel_summary(out_dir, metrics):
         "Target_Rate_RPS": [metrics["config"]["rate"]],
         "Audio_Size_Bytes": [metrics["config"]["audio_size_bytes"]],
         "Language_ID": [metrics["config"]["lang_id"]],
-        "Decoding_Strategy": [metrics["config"]["decoding"]],
     }
     
     df = pd.DataFrame(data)
@@ -385,11 +382,11 @@ def write_excel_summary(out_dir, metrics):
 # ------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Comprehensive ASR Benchmark Tool for MLflow Service - Generates Excel report with all metrics",
+        description="Comprehensive ASR Benchmark Tool for FastAPI - Generates Excel report with all metrics",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--endpoint", required=True, 
-                       help="MLflow ASR endpoint URL (e.g. http://127.0.0.1:5000/asr)")
+                       help="ASR endpoint URL (e.g. http://127.0.0.1:8000/asr)")
     parser.add_argument("--audio", required=True, 
                        help="Path to WAV file used for requests")
     parser.add_argument("--lang_id", required=True, 
@@ -402,8 +399,6 @@ def main():
                        help="Duration in seconds (default: 30)")
     parser.add_argument("--sample_interval", type=float, default=0.5, 
                        help="Sampling interval for GPU/CPU in seconds (default: 0.5)")
-    parser.add_argument("--decoding", type=str, default="ctc",
-                       help="Decoding strategy: 'ctc' or 'greedy' (default: ctc)")
     
     args = parser.parse_args()
     
@@ -445,12 +440,11 @@ def main():
     sys_thread.start()
     
     print(f"\n{'='*60}")
-    print(f"MLflow ASR Benchmark Tool")
+    print(f"ASR Benchmark Tool (FastAPI)")
     print(f"{'='*60}")
     print(f"Endpoint: {args.endpoint}")
     print(f"Audio: {args.audio}")
     print(f"Language: {args.lang_id}")
-    print(f"Decoding: {args.decoding}")
     print(f"Rate: {args.rate} req/s")
     print(f"Duration: {args.duration}s")
     print(f"Output: {outdir}")
@@ -462,7 +456,7 @@ def main():
     start_time = time.time()
     try:
         results = loop.run_until_complete(
-            run_rate_test(args.endpoint, args.audio, args.rate, args.duration, args.lang_id, args.decoding)
+            run_rate_test(args.endpoint, args.audio, args.rate, args.duration, args.lang_id)
         )
     finally:
         end_time = time.time()
@@ -507,8 +501,7 @@ def main():
             "duration_s": args.duration,
             "rate": args.rate,
             "audio_size_bytes": audio_size_bytes,
-            "lang_id": args.lang_id,
-            "decoding": args.decoding
+            "lang_id": args.lang_id
         }
     }
     
