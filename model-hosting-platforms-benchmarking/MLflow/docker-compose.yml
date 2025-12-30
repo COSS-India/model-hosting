@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mlflow-asr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mlflow-asr-service
+    ports:
+      - "5000:5000"
+    environment:
+      - MODEL_PATH=mlruns/0/models/m-8f33614a5aeb46f6a4f4c8b0c64b9cf7/artifacts
+      - HF_TOKEN=${HF_TOKEN:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Optional: Mount model directory if you want to update models without rebuilding
+      # - ./mlruns:/app/mlruns:ro
+      # Optional: Mount for persistent storage
+      # - mlflow-data:/app/mlruns
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Optional: Named volume for persistent storage
+# volumes:
+#   mlflow-data:
+
+
+
+
+
+
