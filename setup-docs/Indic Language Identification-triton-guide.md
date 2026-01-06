@@ -1,4 +1,4 @@
-# Indiclid-triton Service Guide
+# Indic Language Identification-triton Service Guide
 
 ## 📖 What is Indiclid-triton?
 
