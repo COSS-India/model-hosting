@@ -217,30 +217,43 @@ You should see `asr` in the list with status "Up".
 ### Check Service Health
 
 ```bash
-curl http://localhost:5000/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:5000/v2/health/ready
 ```
 
-**Expected Response:** `{"status":"ready"}`
+**Expected Response:** 
+- HTTP Status: `200` 
+- Body: Empty (this is correct - a 200 status code means the service is ready)
 
-If you see this, the service is ready to accept requests!
+Alternatively, check the status code only:
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/v2/health/ready
+# Should output: 200
+```
+
+If you see HTTP 200, the service is ready to accept requests!
 
 ### List Available Models
 
+**Note**: The `/v2/models` endpoint may return a 400 Bad Request in some Triton versions. Instead, check the specific model:
+
 ```bash
-curl http://localhost:5000/v2/models
+curl http://localhost:5000/v2/models/asr_am_ensemble
 ```
 
 **Expected Response:**
 ```json
 {
-  "models": [
-    {
-      "name": "asr_am_ensemble",
-      "platform": "ensemble",
-      "versions": ["1"]
-    }
-  ]
+  "name": "asr_am_ensemble",
+  "platform": "ensemble",
+  "versions": ["1"],
+  "inputs": [...],
+  "outputs": [...]
 }
+```
+
+Or check server information:
+```bash
+curl http://localhost:5000/v2 | python3 -m json.tool
 ```
 
 ### View Logs
@@ -257,6 +270,7 @@ docker logs -f asr
 Look for:
 - `"Server is ready to receive inference requests"` = Success!
 - `"successfully loaded 'asr_am_ensemble' version 1"` = Models loaded successfully
+- `"Initializing ASR models"` = Models initializing
 - Any error messages = Something went wrong
 
 ---
@@ -315,19 +329,19 @@ def test_asr(wav_path, lang_id="hi", endpoint="http://localhost:5000/v2/models/a
                 "name": "AUDIO_SIGNAL",
                 "shape": [1, num_samples],
                 "datatype": "FP32",
-                "data": audio_float.tolist()
+                "data": [audio_float.tolist()]
             },
             {
                 "name": "NUM_SAMPLES",
                 "shape": [1, 1],
                 "datatype": "INT32",
-                "data": [num_samples]
+                "data": [[num_samples]]
             },
             {
                 "name": "LANG_ID",
                 "shape": [1, 1],
                 "datatype": "BYTES",
-                "data": [lang_id]
+                "data": [[lang_id]]
             }
         ]
     }
@@ -426,9 +440,9 @@ w.close()
 
 payload = {
     "inputs": [
-        {"name": "AUDIO_SIGNAL", "shape": [1, num_samples], "datatype": "FP32", "data": audio_float},
-        {"name": "NUM_SAMPLES", "shape": [1, 1], "datatype": "INT32", "data": [num_samples]},
-        {"name": "LANG_ID", "shape": [1, 1], "datatype": "BYTES", "data": ["hi"]}
+        {"name": "AUDIO_SIGNAL", "shape": [1, num_samples], "datatype": "FP32", "data": [audio_float]},
+        {"name": "NUM_SAMPLES", "shape": [1, 1], "datatype": "INT32", "data": [[num_samples]]},
+        {"name": "LANG_ID", "shape": [1, 1], "datatype": "BYTES", "data": [["hi"]]}
     ]
 }
 
@@ -639,8 +653,10 @@ docker run -d --gpus all \
 ### Health Check
 
 ```bash
-curl http://localhost:5000/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:5000/v2/health/ready
 ```
+
+**Note**: The endpoint returns HTTP 200 with an empty body when ready. Check the status code (should be 200).
 
 ### Metrics Endpoint
 
@@ -653,6 +669,7 @@ This provides Prometheus-compatible metrics including:
 - Inference latency
 - GPU utilization
 - Error rates
+- Batch processing statistics
 
 ### View Real-Time Logs
 
@@ -669,6 +686,8 @@ docker stats asr
 ```
 
 Shows CPU, memory, GPU, and network usage in real-time.
+
+Press `Ctrl+C` to stop viewing stats.
 
 ---
 
@@ -713,6 +732,14 @@ docker rm asr
 docker-compose up -d asr
 ```
 
+Or manually:
+```bash
+docker run -d --gpus all -p 5000:8000 -p 5001:8001 -p 5002:8002 \
+  --shm-size=2g --name asr \
+  ai4bharat/triton-multilingual-asr:latest \
+  tritonserver --model-repository=/models
+```
+
 ---
 
 ## 📚 Additional Resources
@@ -754,7 +781,8 @@ docker run -d --gpus all -p 5000:8000 -p 5001:8001 -p 5002:8002 \
 
 # Check status
 docker ps
-curl http://localhost:5000/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:5000/v2/health/ready
+# Note: Returns HTTP 200 with empty body when ready
 
 # View logs
 docker logs -f asr
