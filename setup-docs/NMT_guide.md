@@ -565,7 +565,7 @@ docker run -d --gpus all \
   -p 8000:8000 \
   -p 8001:8001 \
   -p 8002:8002 \
-  --shm-size=64mb \
+  --shm-size=2gb \
   --name indictrans \
   --restart=always \
   -e NVIDIA_VISIBLE_DEVICES=all \
