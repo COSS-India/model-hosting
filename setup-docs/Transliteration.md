@@ -32,6 +32,9 @@ Before you can use this service, you need:
 - **Docker**: Version 20.10+
 - **Docker Compose**: Version 1.29+ (optional, for easier management)
 - **NVIDIA Container Toolkit**: For GPU access in Docker
+- **Shared Memory**: At least 2GB (`shm_size`)
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -211,15 +214,34 @@ docker run -d --gpus all \
 
 The `-d` flag runs it in the background (detached mode).
 
-#### Using Docker Compose (Easiest Method)
+#### Using Docker Compose (Recommended for Production)
 
-If you're using the main docker-compose.yml file:
+Create or use `docker-compose.yml`:
 
+```yaml
+version: '3.8'
+
+services:
+  indic-xlit-server:
+    image: ai4bharat/triton-indic-xlit:latest
+    container_name: indic-xlit-server
+    ports:
+      - "8200:8000"  # HTTP API
+      - "8201:8001"  # GRPC API
+      - "8202:8002"  # Metrics
+    command: tritonserver --model-repository=/models --log-verbose=1 --strict-readiness=false
+    shm_size: 2gb
+    runtime: nvidia
+    restart: always
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+```
+
+Then run:
 ```bash
 docker-compose up -d indic-xlit-server
 ```
-
-This automatically handles all the configuration.
 
 ### Understanding Ports
 
@@ -245,27 +267,40 @@ You should see `indic-xlit-server` in the list with status "Up".
 curl http://localhost:8200/v2/health/ready
 ```
 
-**Expected Response:** `{"status":"ready"}`
+**Expected Response:** 
+- HTTP Status: `200` 
+- Body: Empty (this is correct - a 200 status code means the service is ready)
 
-If you see this, the service is ready to accept requests!
+Alternatively, check the status code only:
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8200/v2/health/ready
+# Should output: 200
+```
+
+If you see HTTP 200, the service is ready to accept requests!
 
 ### List Available Models
 
+**Note**: The `/v2/models` endpoint may return a 400 Bad Request in some Triton versions. Instead, check the specific model:
+
 ```bash
-curl http://localhost:8200/v2/models
+curl http://localhost:8200/v2/models/transliteration
 ```
 
 **Expected Response:**
 ```json
 {
-  "models": [
-    {
-      "name": "indic_xlit",
-      "platform": "python",
-      "versions": ["1"]
-    }
-  ]
+  "name": "transliteration",
+  "platform": "python",
+  "versions": ["1"],
+  "inputs": [...],
+  "outputs": [...]
 }
+```
+
+Or check server information:
+```bash
+curl http://localhost:8200/v2 | python3 -m json.tool
 ```
 
 ### View Logs
@@ -276,18 +311,22 @@ docker logs indic-xlit-server
 
 Look for:
 - `"Server is ready to receive inference requests"` = Success!
+- `"successfully loaded 'transliteration' version 1"` = Model loaded successfully
+- `"Initializing transliteration model"` = Model initializing
 - Any error messages = Something went wrong
 
 ---
 
 ## 🧪 Step 4: Testing the Service
 
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:8200` instead of `http://localhost:8200`.
+
 ### Method 1: Manual Testing with curl
 
 #### Example 1: English to Hindi (Simple)
 
 ```bash
-curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
+curl -X POST http://localhost:8200/v2/models/transliteration/infer \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": [
@@ -333,7 +372,7 @@ curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
 **Expected Response:**
 ```json
 {
-  "model_name": "indic_xlit",
+  "model_name": "transliteration",
   "model_version": "1",
   "outputs": [
     {
@@ -349,7 +388,7 @@ curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
 #### Example 2: English to Bengali
 
 ```bash
-curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
+curl -X POST http://localhost:8200/v2/models/transliteration/infer \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": [
@@ -395,7 +434,7 @@ curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
 #### Example 3: Sentence-level Transliteration (Hindi)
 
 ```bash
-curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
+curl -X POST http://localhost:8200/v2/models/transliteration/infer \
   -H "Content-Type: application/json" \
   -d '{
     "inputs": [
@@ -438,7 +477,43 @@ curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
   }'
 ```
 
-### Method 2: Python Test Script
+### Method 2: Batch Transliteration Example
+
+You can transliterate multiple words by sending multiple requests:
+
+```python
+import requests
+
+def transliterate_batch(words, input_lang, output_lang, word_level=True, top_k=5):
+    """Transliterate multiple words"""
+    results = []
+    for word in words:
+        payload = {
+            "inputs": [
+                {"name": "INPUT_TEXT", "shape": [1], "datatype": "BYTES", "data": [word]},
+                {"name": "INPUT_LANGUAGE_ID", "shape": [1], "datatype": "BYTES", "data": [input_lang]},
+                {"name": "OUTPUT_LANGUAGE_ID", "shape": [1], "datatype": "BYTES", "data": [output_lang]},
+                {"name": "IS_WORD_LEVEL", "shape": [1], "datatype": "BOOL", "data": [word_level]},
+                {"name": "TOP_K", "shape": [1], "datatype": "UINT8", "data": [top_k]}
+            ],
+            "outputs": [{"name": "OUTPUT_TEXT"}]
+        }
+        response = requests.post("http://localhost:8200/v2/models/transliteration/infer", json=payload)
+        result = response.json()
+        transliterated = result["outputs"][0]["data"][0]
+        if isinstance(transliterated, bytes):
+            transliterated = transliterated.decode('utf-8')
+        results.append(transliterated)
+    return results
+
+# Example usage
+words = ["namaste", "dhanyawad", "kripya"]
+transliterations = transliterate_batch(words, "en", "hi")
+for original, transliterated in zip(words, transliterations):
+    print(f"{original} -> {transliterated}")
+```
+
+### Method 3: Python Test Script
 
 Create a file `test_xlit.py`:
 
@@ -457,7 +532,7 @@ def test_transliteration(text, input_lang, output_lang, word_level=True, top_k=5
         word_level: Whether to perform word-level transliteration
         top_k: Number of candidates to return
     """
-    url = "http://localhost:8200/v2/models/indic_xlit/infer"
+    url = "http://localhost:8200/v2/models/transliteration/infer"
     
     payload = {
         "inputs": [
@@ -558,6 +633,25 @@ python3 test_xlit.py
 
 ---
 
+## 📝 Text Format Requirements
+
+### Input Text Guidelines
+
+- **Encoding**: UTF-8
+- **Format**: Plain text (no special formatting required)
+- **Scripts**: Supports English (Roman script) and all Indic scripts (Devanagari, Tamil, Telugu, etc.)
+- **Length**: No strict limit, but word-level transliteration works best with single words or short phrases
+
+### Tips for Best Results
+
+1. **Word-level transliteration** works best for single words
+2. **Sentence-level transliteration** is better for phrases and sentences
+3. **Use appropriate language codes** - check the supported languages list
+4. **Try multiple TOP_K values** to see different transliteration candidates
+5. **For reverse transliteration** (Indic to English), use the Indic language code as INPUT_LANGUAGE_ID and "en" as OUTPUT_LANGUAGE_ID
+
+---
+
 ## 📊 Understanding the API
 
 ### Input Format
@@ -607,7 +701,7 @@ The service returns a JSON response with:
 
 ```json
 {
-  "model_name": "indic_xlit",
+  "model_name": "transliteration",
   "model_version": "1",
   "outputs": [
     {
@@ -694,6 +788,21 @@ The service returns a JSON response with:
 
 ### Docker Run Options
 
+You can customize the container with additional options:
+
+```bash
+docker run -d --gpus all \
+  -p 8200:8000 \
+  -p 8201:8001 \
+  -p 8202:8002 \
+  --shm-size=2gb \
+  --name indic-xlit-server \
+  --restart=always \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  ai4bharat/triton-indic-xlit:latest \
+  tritonserver --model-repository=/models --log-verbose=1 --strict-readiness=false
+```
+
 You can modify the docker run command to adjust:
 
 1. **Shared Memory Size**: 
@@ -708,6 +817,25 @@ You can modify the docker run command to adjust:
 3. **GPU Selection**: 
    - Use `--gpus '"device=0"'` to use specific GPU
    - Use `--gpus all` to use all available GPUs
+
+**Options explained:**
+- `--restart=always` = Automatically restart container if it crashes
+- `-e NVIDIA_VISIBLE_DEVICES=all` = Use all GPUs (can specify specific GPU like "0" or "0,1")
+- `--shm-size=2gb` = Shared memory size (2GB is recommended for this model)
+
+### Resource Allocation
+
+- **GPU Memory**: Model requires ~1GB of GPU memory
+- **System Memory**: At least 4GB RAM recommended
+- **Shared Memory**: 2GB minimum (required for the model)
+- **Batch Processing**: Supports multiple requests efficiently
+
+### Performance Optimization
+
+- **Word-level transliteration** is faster than sentence-level
+- **Lower TOP_K values** process faster
+- **GPU acceleration** significantly improves speed
+- The model uses dynamic batching for better throughput
 
 ### Environment Variables
 
@@ -803,8 +931,10 @@ The service doesn't require environment variables, but you can set:
 ### Health Check
 
 ```bash
-curl http://localhost:8200/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:8200/v2/health/ready
 ```
+
+**Note**: The endpoint returns HTTP 200 with an empty body when ready. Check the status code (should be 200).
 
 ### Metrics Endpoint
 
@@ -817,6 +947,7 @@ This provides Prometheus-compatible metrics including:
 - Inference latency
 - GPU utilization
 - Error rates
+- Batch processing statistics
 
 ### View Real-Time Logs
 
@@ -865,7 +996,12 @@ docker pull ai4bharat/triton-indic-xlit:latest
 docker stop indic-xlit-server
 docker rm indic-xlit-server
 
-# Start new container
+# Start new container (use your preferred method)
+docker-compose up -d indic-xlit-server
+```
+
+Or manually:
+```bash
 docker run -d --gpus all -p 8200:8000 -p 8201:8001 -p 8202:8002 \
   --shm-size=2gb --name indic-xlit-server \
   ai4bharat/triton-indic-xlit:latest \
@@ -911,21 +1047,13 @@ docker run -d --gpus all -p 8200:8000 -p 8201:8001 -p 8202:8002 \
 
 # Check status
 docker ps
-curl http://localhost:8200/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:8200/v2/health/ready
+# Note: Returns HTTP 200 with empty body when ready
 
 # Test (English to Hindi)
-curl -X POST http://localhost:8200/v2/models/indic_xlit/infer \
+curl -X POST http://localhost:8200/v2/models/transliteration/infer \
   -H "Content-Type: application/json" \
-  -d '{
-    "inputs": [
-      {"name": "INPUT_TEXT", "shape": [1], "datatype": "BYTES", "data": ["namaste"]},
-      {"name": "INPUT_LANGUAGE_ID", "shape": [1], "datatype": "BYTES", "data": ["en"]},
-      {"name": "OUTPUT_LANGUAGE_ID", "shape": [1], "datatype": "BYTES", "data": ["hi"]},
-      {"name": "IS_WORD_LEVEL", "shape": [1], "datatype": "BOOL", "data": [true]},
-      {"name": "TOP_K", "shape": [1], "datatype": "UINT8", "data": [5]}
-    ],
-    "outputs": [{"name": "OUTPUT_TEXT"}]
-  }'
+  -d '{"inputs":[{"name":"INPUT_TEXT","shape":[1],"datatype":"BYTES","data":["namaste"]},{"name":"INPUT_LANGUAGE_ID","shape":[1],"datatype":"BYTES","data":["en"]},{"name":"OUTPUT_LANGUAGE_ID","shape":[1],"datatype":"BYTES","data":["hi"]},{"name":"IS_WORD_LEVEL","shape":[1],"datatype":"BOOL","data":[true]},{"name":"TOP_K","shape":[1],"datatype":"UINT8","data":[5]}]}'
 
 # View logs
 docker logs -f indic-xlit-server
@@ -942,14 +1070,23 @@ docker stop indic-xlit-server
 
 ### Model Information
 
-- **Model Name**: `indic_xlit`
-- **Backend**: Python
+- **Model Name**: `transliteration`
+- **Type**: Python backend
 - **GPU Required**: Recommended (can run on CPU)
 - **Supported Languages**: 10 Indic languages + English
 - **Shared Memory**: 2GB minimum
+- **Max Batch Size**: Supports efficient batch processing
 
-### Language Codes
+### Language Codes Quick Reference
 
+Common pairs:
+- **English ↔ Hindi**: en ↔ hi
+- **English ↔ Tamil**: en ↔ ta
+- **English ↔ Telugu**: en ↔ te
+- **English ↔ Bengali**: en ↔ bn
+- **English ↔ Gujarati**: en ↔ gu
+
+Full list:
 - **hi** - Hindi
 - **bn** - Bengali
 - **gu** - Gujarati
@@ -967,15 +1104,15 @@ docker stop indic-xlit-server
 ## ✅ Summary
 
 You've learned how to:
-1. ✅ Pull the Indic-xlit Docker image
-2. ✅ Run the service
-3. ✅ Verify it's working
-4. ✅ Test transliteration (English to Indic scripts)
-5. ✅ Use the API with different languages
+1. ✅ Pull the Indic-xlit Docker image from Docker Hub
+2. ✅ Run the Indic-xlit service container
+3. ✅ Verify it's working correctly
+4. ✅ Test transliteration with text input
+5. ✅ Use the API for transliterating between scripts
 6. ✅ Understand word-level vs sentence-level transliteration
 7. ✅ Troubleshoot common issues
 
-The Indic-xlit service is now ready to transliterate text between English and Indic scripts! For production use, consider setting up monitoring, load balancing, and proper security measures.
+The Indic-xlit-triton service is now ready to transliterate text between English and Indic scripts! For production use, consider setting up monitoring, load balancing, and proper security measures.
 
 ---
 
