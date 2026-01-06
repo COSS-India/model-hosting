@@ -39,6 +39,8 @@ Before you can use this service, you need:
 - **Hardware Specifications**: May vary depending on the scale of your application
 - **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
+> **Note**: The model used in this service is provided as a reference implementation. You can replace it with your own trained model or use different model variants based on your specific requirements, performance needs, and use case.
+
 **Software Installation:**
 ```bash
 # Install Docker
