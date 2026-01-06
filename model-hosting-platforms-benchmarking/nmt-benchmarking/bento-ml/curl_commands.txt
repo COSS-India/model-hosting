@@ -1,0 +1,27 @@
+# BentoML IndicTrans2 NMT Service - Raw CURL Commands
+# Copy and paste these commands directly into your terminal
+
+# English to Hindi
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"Hello, how are you?","src_lang":"eng_Latn","tgt_lang":"hin_Deva"}'
+
+# Hindi to English
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"नमस्ते, आप कैसे हैं?","src_lang":"hin_Deva","tgt_lang":"eng_Latn"}'
+
+# English to Marathi
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"Good morning","src_lang":"eng_Latn","tgt_lang":"mar_Deva"}'
+
+# Hindi to Marathi (Indic-Indic)
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"नमस्ते","src_lang":"hin_Deva","tgt_lang":"mar_Deva"}'
+
+# English to Gujarati
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"Hello world","src_lang":"eng_Latn","tgt_lang":"guj_Gujr"}'
+
+# English to Tamil
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"Hello world","src_lang":"eng_Latn","tgt_lang":"tam_Taml"}'
+
+# English to Telugu
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"Hello world","src_lang":"eng_Latn","tgt_lang":"tel_Telu"}'
+
+# Pretty print JSON response (add | python3 -m json.tool at the end)
+curl -X POST http://localhost:3000/translate -H "Content-Type: application/json" -d '{"text":"Hello","src_lang":"eng_Latn","tgt_lang":"hin_Deva"}' | python3 -m json.tool
+

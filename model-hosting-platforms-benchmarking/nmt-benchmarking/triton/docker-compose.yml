@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  triton-indictrans:
+    image: ai4bharat/triton-indictrans-v2:latest
+    container_name: triton-indictrans-v2
+    ports:
+      - "8000:8000"  # HTTP endpoint
+      - "8001:8001"  # gRPC endpoint
+      - "8002:8002"  # Metrics endpoint
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    restart: unless-stopped
+    shm_size: '1gb'
+    volumes:
+      - ./models:/models  # Mount models directory if needed
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+

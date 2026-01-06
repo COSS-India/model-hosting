@@ -1,0 +1,30 @@
+# Quick Copy-Paste Curl Commands for Triton IndicTrans v2
+
+# Model: nmt
+# Server: http://localhost:8000
+# Language codes: en (English), hi (Hindi)
+
+# 1. Health Check
+curl -v http://localhost:8000/v2/health/ready
+
+# 2. Get Model Metadata
+curl http://localhost:8000/v2/models/nmt
+
+# 3. Get Model Configuration
+curl http://localhost:8000/v2/models/nmt/config | python3 -m json.tool
+
+# 4. Translation: English to Hindi
+curl -X POST http://localhost:8000/v2/models/nmt/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"inputs":[{"name":"INPUT_TEXT","datatype":"BYTES","shape":[1,1],"data":["Hello, how are you?"]},{"name":"INPUT_LANGUAGE_ID","datatype":"BYTES","shape":[1,1],"data":["en"]},{"name":"OUTPUT_LANGUAGE_ID","datatype":"BYTES","shape":[1,1],"data":["hi"]}]}' | python3 -m json.tool
+
+# 5. Translation: Hindi to English
+curl -X POST http://localhost:8000/v2/models/nmt/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"inputs":[{"name":"INPUT_TEXT","datatype":"BYTES","shape":[1,1],"data":["नमस्ते, आप कैसे हैं?"]},{"name":"INPUT_LANGUAGE_ID","datatype":"BYTES","shape":[1,1],"data":["hi"]},{"name":"OUTPUT_LANGUAGE_ID","datatype":"BYTES","shape":[1,1],"data":["en"]}]}' | python3 -m json.tool
+
+# 6. Custom Translation (replace TEXT, SRC_LANG, TGT_LANG)
+curl -X POST http://localhost:8000/v2/models/nmt/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"inputs":[{"name":"INPUT_TEXT","datatype":"BYTES","shape":[1,1],"data":["TEXT"]},{"name":"INPUT_LANGUAGE_ID","datatype":"BYTES","shape":[1,1],"data":["SRC_LANG"]},{"name":"OUTPUT_LANGUAGE_ID","datatype":"BYTES","shape":[1,1],"data":["TGT_LANG"]}]}' | python3 -m json.tool
+
