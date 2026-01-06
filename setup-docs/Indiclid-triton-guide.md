@@ -30,6 +30,8 @@ Before you can use this service, you need:
 - **Docker**: Version 20.10+
 - **Docker Compose**: Version 1.29+
 - **NVIDIA Container Toolkit**: For GPU access in Docker
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -332,25 +334,9 @@ Look for:
 
 ## 🧪 Step 4: Testing the Service
 
-### Method 1: Using the Provided Test Script (Easiest)
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:8000` instead of `http://localhost:8000`.
 
-```bash
-cd indiclid-triton
-python3 test_client.py
-```
-
-This script tests all supported languages in both native and roman scripts.
-
-**Expected Output:**
-```
-Testing Hindi (Native Script): मैं भारत से हूं
-Result: {"langCode": "hin_Deva", "confidence": 0.9999, "model": "IndicLID-FTN"}
-
-Testing Hindi (Roman Script): main bharat se hoon
-Result: {"langCode": "hin_Latn", "confidence": 0.9850, "model": "IndicLID-FTR"}
-```
-
-### Method 2: Manual Testing with curl
+### Method 1: Manual Testing with curl
 
 #### Native Script Example (Hindi)
 
@@ -410,7 +396,7 @@ curl -X POST http://localhost:8000/v2/models/indiclid/infer \
   }'
 ```
 
-### Method 3: Python Test Script
+### Method 2: Python Test Script
 
 Create a file `test_my_text.py`:
 
@@ -454,6 +440,14 @@ print(f"Model Used: {result_json['model']}")
 Run it:
 ```bash
 python3 test_my_text.py
+```
+
+**Expected Output:**
+```
+Input: मैं भारत से हूं
+Detected Language: hin_Deva
+Confidence: 0.9999
+Model Used: IndicLID-FTN
 ```
 
 ---

@@ -30,6 +30,8 @@ Before you can use this service, you need:
 - **Docker**: Version 20.10+
 - **Docker Compose**: Version 1.29+
 - **NVIDIA Container Toolkit**: For GPU access in Docker
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -324,28 +326,9 @@ Look for:
 
 ## 🧪 Step 4: Testing the Service
 
-### Method 1: Using the Provided Test Script (Easiest)
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:8600` instead of `http://localhost:8600`.
 
-```bash
-cd Language-diarization-triton
-python3 test_client.py
-```
-
-This script:
-1. Loads a test audio file
-2. Sends it to the service
-3. Displays the language diarization timeline
-
-**Expected Output:**
-```
-Total segments: 5
-  [0.00s - 2.00s]: ta: Tamil (confidence: 0.9850)
-  [2.00s - 4.00s]: en: English (confidence: 0.9200)
-  [4.00s - 6.00s]: ta: Tamil (confidence: 0.9500)
-  ...
-```
-
-### Method 2: Manual Testing with curl
+### Method 1: Manual Testing with curl
 
 #### Step 1: Prepare Your Audio File
 
@@ -424,7 +407,7 @@ curl -X POST http://localhost:8600/v2/models/lang_diarization/infer \
 }
 ```
 
-### Method 3: Python Test Script
+### Method 2: Python Test Script
 
 Create a file `test_my_audio.py`:
 
@@ -478,6 +461,19 @@ for segment in diarization_result['segments']:
 Run it:
 ```bash
 python3 test_my_audio.py
+```
+
+**Expected Output:**
+```
+Total segments: 5
+Target language: all
+
+Segments:
+  [0.00s - 2.00s]: ta: Tamil (confidence: 0.9850)
+  [2.00s - 4.00s]: en: English (confidence: 0.9200)
+  [4.00s - 6.00s]: ta: Tamil (confidence: 0.9500)
+  [6.00s - 8.00s]: en: English (confidence: 0.9100)
+  [8.00s - 10.00s]: ta: Tamil (confidence: 0.9600)
 ```
 
 ---

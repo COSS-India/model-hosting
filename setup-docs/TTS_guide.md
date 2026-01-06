@@ -34,6 +34,8 @@ Before you can use this service, you need:
 - **Docker Compose**: Version 1.29+ (optional, but recommended)
 - **NVIDIA Container Toolkit**: For GPU access in Docker
 - **Shared Memory**: At least 2GB (`shm_size`)
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -280,6 +282,8 @@ Look for:
 
 ## 🧪 Step 4: Testing the Service
 
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:9000` instead of `http://localhost:9000`.
+
 ### Method 1: Using a Python Script (Recommended)
 
 Create a file `test_tts.py`:
@@ -400,11 +404,25 @@ if __name__ == "__main__":
 python3 test_tts.py "नमस्ते, यह एक परीक्षण है" female hi output.wav
 ```
 
-The script will:
-1. Send the text to the TTS service
-2. Receive the generated audio
-3. Save it as a WAV file
-4. Display information about the generated audio
+**Expected Output:**
+```
+Generating speech:
+  Text: नमस्ते, यह एक परीक्षण है
+  Language: hi
+  Speaker: female
+
+Sending request to: http://localhost:9000/v2/models/tts/infer
+
+=== Response received ===
+Audio samples: 48510
+
+=== Audio saved ===
+Output file: /path/to/output.wav
+Sample rate: 22050 Hz
+Duration: 2.20 seconds
+```
+
+**Note**: The audio data in the response contains BASE64 content.
 
 ### Method 2: Using curl (Manual Testing)
 

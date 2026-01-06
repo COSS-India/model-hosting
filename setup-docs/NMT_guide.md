@@ -34,6 +34,8 @@ Before you can use this service, you need:
 - **Docker Compose**: Version 1.29+ (optional, but recommended)
 - **NVIDIA Container Toolkit**: For GPU access in Docker
 - **Shared Memory**: At least 64MB (`shm_size`)
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -264,6 +266,8 @@ Look for:
 ---
 
 ## 🧪 Step 4: Testing the Service
+
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:8000` instead of `http://localhost:8000`.
 
 ### Method 1: Using a Python Script (Recommended)
 

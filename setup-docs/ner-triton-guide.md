@@ -36,6 +36,8 @@ Before you can use this service, you need:
 - **Docker Compose**: Version 1.29+
 - **NVIDIA Container Toolkit**: For GPU access in Docker
 - **HuggingFace Account**: Required for model access
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -384,27 +386,9 @@ Look for:
 
 ## 🧪 Step 4: Testing the Service
 
-### Method 1: Using the Provided Test Script (Easiest)
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:8300` instead of `http://localhost:8300`.
 
-```bash
-cd ner-triton
-python3 test_client.py
-```
-
-This script:
-1. Tests with sample Hindi text
-2. Sends it to the service
-3. Displays the detected entities
-
-**Expected Output:**
-```
-Source: राम दिल्ली में रहते हैं
-Entities:
-  - राम: PERSON (score: 0.95)
-  - दिल्ली: LOCATION (score: 0.98)
-```
-
-### Method 2: Manual Testing with curl
+### Method 1: Manual Testing with curl
 
 #### Hindi Example
 
@@ -476,7 +460,7 @@ curl -X POST http://localhost:8300/v2/models/ner/infer \
   }'
 ```
 
-### Method 3: Python Test Script
+### Method 2: Python Test Script
 
 Create a file `test_my_text.py`:
 
@@ -527,6 +511,14 @@ for entity in ner_result['nerPrediction']:
 Run it:
 ```bash
 python3 test_my_text.py
+```
+
+**Expected Output:**
+```
+Source: राम दिल्ली में रहते हैं
+Entities:
+  - राम: PERSON (score: 0.95)
+  - दिल्ली: LOCATION (score: 0.98)
 ```
 
 ---

@@ -32,6 +32,8 @@ Before you can use this service, you need:
 - **Docker**: Version 20.10+
 - **Docker Compose**: Version 1.29+ (optional, but recommended)
 - **NVIDIA Container Toolkit**: For GPU access in Docker
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 - **Shared Memory**: At least 2GB (`shm_size`)
 
 **Software Installation:**
@@ -259,6 +261,8 @@ Look for:
 
 ## 🧪 Step 4: Testing the Service
 
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:5000` instead of `http://localhost:5000`.
+
 ### Method 1: Using a Python Script (Recommended)
 
 Create a file `test_asr.py`:
@@ -363,6 +367,34 @@ if __name__ == "__main__":
 **Run the script:**
 ```bash
 python3 test_asr.py your_audio.wav hi
+```
+
+**Expected Output:**
+```
+Audio file: your_audio.wav
+Sample rate: 16000 Hz
+Number of samples: 48000
+Duration: 3.00 seconds
+Language ID: hi
+
+Sending request to: http://localhost:5000/v2/models/asr_am_ensemble/infer
+
+=== Response ===
+{
+  "model_name": "asr_am_ensemble",
+  "model_version": "1",
+  "outputs": [
+    {
+      "name": "TRANSCRIPTS",
+      "datatype": "BYTES",
+      "shape": [1],
+      "data": ["नमस्ते, मैं कैसे आपकी मदद कर सकता हूं"]
+    }
+  ]
+}
+
+=== Transcript ===
+नमस्ते, मैं कैसे आपकी मदद कर सकता हूं
 ```
 
 ### Method 2: Using curl (Manual Testing)

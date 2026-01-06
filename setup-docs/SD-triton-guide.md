@@ -32,6 +32,8 @@ Before you can use this service, you need:
 - **Docker Compose**: Version 1.29+
 - **NVIDIA Container Toolkit**: For GPU access in Docker
 - **HuggingFace Account**: Required for model access
+- **Hardware Specifications**: May vary depending on the scale of your application
+- **Tested Machine**: g4dn.2xlarge (For detailed specifications and pricing, check [AWS EC2 g4dn.2xlarge](https://instances.vantage.sh/aws/ec2/g4dn.2xlarge?currency=USD))
 
 **Software Installation:**
 ```bash
@@ -405,40 +407,9 @@ Look for:
 
 ## 🧪 Step 4: Testing the Service
 
-### Method 1: Using the Provided Test Script (Easiest)
+> **Note**: If you're accessing the service from a remote machine, replace `localhost` with your server's IP address. For example, if your server IP is `192.168.1.100`, use `http://192.168.1.100:8700` instead of `http://localhost:8700`.
 
-```bash
-cd SD-triton
-
-# Basic usage (auto-detect speakers)
-python3 test_client.py audio.wav
-
-# With specific number of speakers
-python3 test_client.py audio.wav --num-speakers 2
-
-# Pretty print JSON output
-python3 test_client.py audio.wav --pretty
-```
-
-This script:
-1. Loads your audio file
-2. Sends it to the service
-3. Displays the speaker diarization timeline
-
-**Expected Output:**
-```
-Total segments: 5
-Number of speakers: 2
-Speakers: ['SPEAKER_00', 'SPEAKER_01']
-
-Segments:
-  [0.50s - 2.10s]: SPEAKER_00 (duration: 1.60s)
-  [2.50s - 4.00s]: SPEAKER_01 (duration: 1.50s)
-  [4.20s - 6.50s]: SPEAKER_00 (duration: 2.30s)
-  ...
-```
-
-### Method 2: Manual Testing with curl
+### Method 1: Manual Testing with curl
 
 #### Step 1: Prepare Your Audio File
 
@@ -517,7 +488,7 @@ curl -X POST http://localhost:8700/v2/models/speaker_diarization/infer \
 }
 ```
 
-### Method 3: Python Test Script
+### Method 2: Python Test Script
 
 Create a file `test_my_audio.py`:
 
@@ -584,6 +555,20 @@ Run it:
 python3 test_my_audio.py your_audio.wav
 # Or with specific number of speakers:
 python3 test_my_audio.py your_audio.wav 2
+```
+
+**Expected Output:**
+```
+Total segments: 5
+Number of speakers: 2
+Speakers: ['SPEAKER_00', 'SPEAKER_01']
+
+Segments:
+  [0.50s - 2.10s]: SPEAKER_00 (duration: 1.60s)
+  [2.50s - 4.00s]: SPEAKER_01 (duration: 1.50s)
+  [4.20s - 6.50s]: SPEAKER_00 (duration: 2.30s)
+  [6.80s - 8.20s]: SPEAKER_01 (duration: 1.40s)
+  [8.50s - 10.00s]: SPEAKER_00 (duration: 1.50s)
 ```
 
 ---
