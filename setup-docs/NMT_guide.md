@@ -222,30 +222,43 @@ You should see `indictrans` in the list with status "Up".
 ### Check Service Health
 
 ```bash
-curl http://localhost:8000/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:8000/v2/health/ready
 ```
 
-**Expected Response:** `{"status":"ready"}`
+**Expected Response:** 
+- HTTP Status: `200` 
+- Body: Empty (this is correct - a 200 status code means the service is ready)
 
-If you see this, the service is ready to accept requests!
+Alternatively, check the status code only:
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/v2/health/ready
+# Should output: 200
+```
+
+If you see HTTP 200, the service is ready to accept requests!
 
 ### List Available Models
 
+**Note**: The `/v2/models` endpoint may return a 400 Bad Request in some Triton versions. Instead, check the specific model:
+
 ```bash
-curl http://localhost:8000/v2/models
+curl http://localhost:8000/v2/models/nmt
 ```
 
 **Expected Response:**
 ```json
 {
-  "models": [
-    {
-      "name": "nmt",
-      "platform": "python",
-      "versions": ["1"]
-    }
-  ]
+  "name": "nmt",
+  "platform": "python",
+  "versions": ["1"],
+  "inputs": [...],
+  "outputs": [...]
 }
+```
+
+Or check server information:
+```bash
+curl http://localhost:8000/v2 | python3 -m json.tool
 ```
 
 ### View Logs
@@ -296,19 +309,19 @@ def test_nmt(text, source_lang, target_lang, endpoint="http://localhost:8000/v2/
         "inputs": [
             {
                 "name": "INPUT_TEXT",
-                "shape": [1],
+                "shape": [1, 1],
                 "datatype": "BYTES",
                 "data": [text]
             },
             {
                 "name": "INPUT_LANGUAGE_ID",
-                "shape": [1],
+                "shape": [1, 1],
                 "datatype": "BYTES",
                 "data": [source_lang]
             },
             {
                 "name": "OUTPUT_LANGUAGE_ID",
-                "shape": [1],
+                "shape": [1, 1],
                 "datatype": "BYTES",
                 "data": [target_lang]
             }
@@ -376,19 +389,19 @@ curl -X POST http://localhost:8000/v2/models/nmt/infer \
     "inputs": [
       {
         "name": "INPUT_TEXT",
-        "shape": [1],
+        "shape": [1, 1],
         "datatype": "BYTES",
         "data": ["Hello, how are you?"]
       },
       {
         "name": "INPUT_LANGUAGE_ID",
-        "shape": [1],
+        "shape": [1, 1],
         "datatype": "BYTES",
         "data": ["en"]
       },
       {
         "name": "OUTPUT_LANGUAGE_ID",
-        "shape": [1],
+        "shape": [1, 1],
         "datatype": "BYTES",
         "data": ["hi"]
       }
@@ -403,7 +416,7 @@ curl -X POST http://localhost:8000/v2/models/nmt/infer \
     {
       "name": "OUTPUT_TEXT",
       "datatype": "BYTES",
-      "shape": [1],
+      "shape": [1, 1],
       "data": ["नमस्ते, आप कैसे हैं?"]
     }
   ]
@@ -423,9 +436,9 @@ def translate_batch(texts, source_lang, target_lang):
     for text in texts:
         payload = {
             "inputs": [
-                {"name": "INPUT_TEXT", "shape": [1], "datatype": "BYTES", "data": [text]},
-                {"name": "INPUT_LANGUAGE_ID", "shape": [1], "datatype": "BYTES", "data": [source_lang]},
-                {"name": "OUTPUT_LANGUAGE_ID", "shape": [1], "datatype": "BYTES", "data": [target_lang]}
+                {"name": "INPUT_TEXT", "shape": [1, 1], "datatype": "BYTES", "data": [text]},
+                {"name": "INPUT_LANGUAGE_ID", "shape": [1, 1], "datatype": "BYTES", "data": [source_lang]},
+                {"name": "OUTPUT_LANGUAGE_ID", "shape": [1, 1], "datatype": "BYTES", "data": [target_lang]}
             ]
         }
         response = requests.post("http://localhost:8000/v2/models/nmt/infer", json=payload)
@@ -459,19 +472,19 @@ for original, translated in zip(texts, translations):
 
 **INPUT_TEXT** (Required)
 - **Type**: BYTES (string)
-- **Shape**: `[1]` (single text string)
+- **Shape**: `[1, 1]` (single text string - 2D array)
 - **Description**: The text to be translated
 - **Format**: UTF-8 encoded string
 
 **INPUT_LANGUAGE_ID** (Required)
 - **Type**: BYTES (string)
-- **Shape**: `[1]`
+- **Shape**: `[1, 1]` (2D array)
 - **Description**: Source language code (language of INPUT_TEXT)
 - **Supported Codes**: See language list below
 
 **OUTPUT_LANGUAGE_ID** (Required)
 - **Type**: BYTES (string)
-- **Shape**: `[1]`
+- **Shape**: `[1, 1]` (2D array)
 - **Description**: Target language code (desired translation language)
 - **Supported Codes**: See language list below
 
@@ -479,9 +492,11 @@ for original, translated in zip(texts, translations):
 
 **OUTPUT_TEXT**
 - **Type**: BYTES (string)
-- **Shape**: `[1]`
+- **Shape**: `[1, 1]` (2D array)
 - **Description**: Translated text in the target language
 - **Format**: UTF-8 encoded string
+
+> **Important**: All input shapes must be `[1, 1]` (2D array), not `[1]` (1D array). The model expects a 2D shape where `-1` represents the variable batch dimension, but for single requests you use `[1, 1]`.
 
 ### Supported Languages
 
@@ -667,8 +682,10 @@ The model supports **dynamic batching**, which means:
 ### Health Check
 
 ```bash
-curl http://localhost:8000/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:8000/v2/health/ready
 ```
+
+**Note**: The endpoint returns HTTP 200 with an empty body when ready. Check the status code (should be 200).
 
 ### Metrics Endpoint
 
@@ -785,12 +802,13 @@ docker run -d --gpus all -p 8000:8000 -p 8001:8001 -p 8002:8002 \
 
 # Check status
 docker ps
-curl http://localhost:8000/v2/health/ready
+curl -w "\nHTTP Status: %{http_code}\n" http://localhost:8000/v2/health/ready
+# Note: Returns HTTP 200 with empty body when ready
 
 # Test translation
 curl -X POST http://localhost:8000/v2/models/nmt/infer \
   -H "Content-Type: application/json" \
-  -d '{"inputs":[{"name":"INPUT_TEXT","shape":[1],"datatype":"BYTES","data":["Hello"]},{"name":"INPUT_LANGUAGE_ID","shape":[1],"datatype":"BYTES","data":["en"]},{"name":"OUTPUT_LANGUAGE_ID","shape":[1],"datatype":"BYTES","data":["hi"]}]}'
+  -d '{"inputs":[{"name":"INPUT_TEXT","shape":[1,1],"datatype":"BYTES","data":["Hello"]},{"name":"INPUT_LANGUAGE_ID","shape":[1,1],"datatype":"BYTES","data":["en"]},{"name":"OUTPUT_LANGUAGE_ID","shape":[1,1],"datatype":"BYTES","data":["hi"]}]}'
 
 # View logs
 docker logs -f indictrans
