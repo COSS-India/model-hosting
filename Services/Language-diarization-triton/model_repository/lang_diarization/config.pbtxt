@@ -1,0 +1,49 @@
+name: "lang_diarization"
+backend: "python"
+max_batch_size: 32
+
+input [
+  {
+    name: "AUDIO_DATA"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "LANGUAGE"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "DIARIZATION_RESULT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [ 1, 2, 4, 8, 16, 32 ]
+  max_queue_delay_microseconds: 100000
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
