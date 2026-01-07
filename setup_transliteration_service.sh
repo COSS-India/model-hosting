@@ -40,10 +40,11 @@ show_spinner() {
 
 # Function to wait for service to be ready
 wait_for_service() {
-    local max_attempts=60
+    local max_attempts=180
     local attempt=1
     
     print_message "Waiting for service to be ready..." "$CYAN"
+    print_message "This may take 3-5 minutes on first run while models are being downloaded and loaded..." "$YELLOW"
     
     while [ $attempt -le $max_attempts ]; do
         if curl -s -f http://localhost:${HTTP_PORT}/v2/health/ready > /dev/null 2>&1; then
@@ -51,12 +52,14 @@ wait_for_service() {
             return 0
         fi
         
-        printf "\r${YELLOW}[${attempt}/${max_attempts}]${NC} Waiting for service to start..."
+        printf "\r${YELLOW}[${attempt}/${max_attempts}]${NC} Waiting for service to start... (checking every 2s)"
         sleep 2
         attempt=$((attempt + 1))
     done
     
     print_message "Service failed to start within expected time!" "$RED"
+    print_message "Checking container logs..." "$YELLOW"
+    docker logs --tail 30 ${CONTAINER_NAME} 2>&1 | tail -15
     return 1
 }
 
