@@ -59,8 +59,8 @@
 |------------------------|--------------------------------------------|
 | **Cloud Provider**     | AWS (ap-south-1 / Mumbai)                  |
 | **Instance Type**      | EC2 with NVIDIA Tesla T4 GPU               |
-| **Instance ID**        | `i-0a1251ef5fab6ebec`                      |
-| **Public IP**          | `13.201.75.118`                            |
+| **Instance ID**        | `i-0axxxxxxxxxc`                      |
+| **Public IP**          | `13.xxx.xxx.xxx`                            |
 | **OS**                 | Ubuntu 22.04.5 LTS                         |
 | **Kernel**             | 6.8.0-1040-aws                             |
 | **GPU**                | NVIDIA Tesla T4 — 15,360 MiB (15 GB) VRAM |
@@ -281,15 +281,15 @@ Ollama stores downloaded models at: `~/.ollama/models/` (for the ollama user)
 
 ## 6. API Reference
 
-**Base URL:** `http://13.201.75.118:8000`
-**Swagger UI:** `http://13.201.75.118:8000/docs`
+**Base URL:** `http://13.xxx.xxx.xxx:8000`
+**Swagger UI:** `http://13.xxx.xxx.xxx:8000/docs`
 
 ### GET /health
 
 Check service health.
 
 ```bash
-curl http://13.201.75.118:8000/health
+curl http://13.xxx.xxx.xxx:8000/health
 ```
 
 **Response:**
@@ -324,7 +324,7 @@ Translate text between languages with optional context.
 - `"Sentence is in legal context"` — uses legal terminology
 
 ```bash
-curl -X POST http://13.201.75.118:8000/api/translate \
+curl -X POST http://13.xxx.xxx.xxx:8000/api/translate \
   -H "Content-Type: application/json" \
   -d '{
     "text": "I am going to the market today",
@@ -348,7 +348,7 @@ Summarize text with optional style and context.
 | `context`       | string  | No       | Audience or focus context                           |
 
 ```bash
-curl -X POST http://13.201.75.118:8000/api/summarize \
+curl -X POST http://13.xxx.xxx.xxx:8000/api/summarize \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Long text to summarize...",
@@ -371,7 +371,7 @@ General-purpose natural language query.
 | `context`       | string | No       | Additional context               |
 
 ```bash
-curl -X POST http://13.201.75.118:8000/api/query \
+curl -X POST http://13.xxx.xxx.xxx:8000/api/query \
   -H "Content-Type: application/json" \
   -d '{
     "query": "Explain microservices architecture",
@@ -400,7 +400,7 @@ All endpoints return:
 ## 7. How a Request Flows
 
 ```
-1. Your backend sends POST to http://13.201.75.118:8000/api/translate
+1. Your backend sends POST to http://13.xxx.xxx.xxx:8000/api/translate
        │
        ▼
 2. FastAPI gateway receives the request
@@ -495,4 +495,4 @@ ollama show gpt-oss:20b
 ---
 
 *Last updated: February 2026*
-*Server: 13.201.75.118 | Region: ap-south-1 (Mumbai)*
+*Server: 13.xxx.xxx.xxx | Region: ap-south-1 (Mumbai)*
