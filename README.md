@@ -14,6 +14,7 @@ The repo is intended for:
 ## Repository Structure
 ```bash
 .
+├── nmt-triton/                          # CPU local NMT (IndicTrans2 + Triton)
 ├── model-hosting-platforms-benchmarking/
 ├── setup-docs/
 └── README.md
@@ -51,6 +52,18 @@ This section is especially useful for **platform selection decisions** and **cap
 
 ---
 
+## 🚀 `nmt-triton/`
+
+CPU-only **IndicTrans2** Triton deployment for local development and testing.
+
+- Docker build + Triton model repository (`models/nmt/`)
+- HTTP API on port **8000** (`/v2/models/nmt/infer`)
+- No GPU required
+
+See `nmt-triton/README.md` for build, run, and verification steps.
+
+---
+
 ## 🛠️ `setup-docs/`
 
 This folder contains **detailed setup guides** for deploying various NLP and Language AI models, primarily using **NVIDIA Triton Inference Server**.
@@ -81,11 +94,14 @@ These guides are designed to reduce **time-to-deployment** and encourage **best 
 - **Evaluating serving platforms?**  
   → Start with `model-hosting-platforms-benchmarking/`
 
-- **Deploying NLP models on Triton?**  
-  → Go directly to `setup-docs/`
+- **Local CPU NMT on Triton?**  
+  → Start with `nmt-triton/`
+
+- **Deploying NLP models on Triton (GPU)?**  
+  → Go to `setup-docs/`
 
 - **Building a Language AI platform or sandbox?**  
-  → Use both folders together: benchmark first, then deploy with confidence.
+  → Use benchmarking and setup guides together: benchmark first, then deploy with confidence.
 
 ---
 
